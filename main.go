@@ -38,7 +38,7 @@ func main() {
 	}
 
 	client := &http.Client{
-		Jar: jar,
+		Jar:       jar,
 		Transport: &http.Transport{Proxy: http.ProxyURL(proxyUrl)},
 	}
 
@@ -55,34 +55,32 @@ func main() {
 	dayN := calendar.Data.Date.YDay
 
 	var events []Event
-	weeks:
-		for _, w := range calendar.Data.Weeks {
-			for _, d := range w.Days {
-				if d.YDay >= dayN {
-					for _, e := range d.Events {
-						if time.Now().Unix() >
-								e.TimeStart + e.TimeDuration {
-							fmt.Printf(
-								"You've skipped event: '%s' at %s\n",
-								e.Course.FullName,
-								time.Unix(e.TimeStart, 0).
-									Format(time.UnixDate),
-							)
-							continue
-						}
-
-						events = append(events, e)
+	for _, w := range calendar.Data.Weeks {
+		for _, d := range w.Days {
+			if d.YDay >= dayN {
+				for _, e := range d.Events {
+					if time.Now().Unix() >
+						e.TimeStart+e.TimeDuration {
+						fmt.Printf(
+							"You've skipped event: '%s' at %s\n",
+							e.Course.FullName,
+							time.Unix(e.TimeStart, 0).
+								Format(time.UnixDate),
+						)
+						continue
 					}
-					break weeks
+
+					events = append(events, e)
 				}
 			}
 		}
+	}
 
 	wg := sync.WaitGroup{}
 	wg.Add(len(events))
 	latency := int64(time.Minute.Seconds())
 
-	fmt.Printf("%+v\n", events)
+	//fmt.Printf("%+v\n", events)
 	if len(events) == 0 {
 		fmt.Println("Nothing to visit((")
 	}
@@ -94,16 +92,16 @@ func main() {
 			sleep := e.TimeStart + latency - time.Now().Unix()
 
 			fmt.Printf(
-				"%s will be visited after %d seconds\n",
+				"'%s' will be visited after %d minutes\n",
 				e.Course.FullName,
-				sleep,
+				sleep/int64(time.Minute.Seconds()),
 			)
 
-			time.AfterFunc(
-				time.Second * time.Duration(sleep),
-				func(){
-					visitEvent(e, client)
-				},
+			time.Sleep(time.Second * time.Duration(sleep))
+			visitEvent(e, client)
+			fmt.Printf(
+				"'%s' has been visited now\n",
+				e.Course.FullName,
 			)
 		}()
 	}
@@ -133,10 +131,10 @@ func auth(client *http.Client) (string, error) {
 	loginToken := simpleParse(body, "name=\"logintoken\" value=\"", "\"")
 
 	values := url.Values{
-		"anchor": {""},
+		"anchor":     {""},
 		"logintoken": {string(loginToken)},
-		"username": {os.Getenv("DL_LOGIN")},
-		"password": {os.Getenv("DL_PASSWORD")},
+		"username":   {os.Getenv("DL_LOGIN")},
+		"password":   {os.Getenv("DL_PASSWORD")},
 	}
 
 	req, err := http.NewRequest(
@@ -165,21 +163,21 @@ func auth(client *http.Client) (string, error) {
 	return string(simpleParse(body, "\"sesskey\":\"", "\"")), nil
 }
 
-func getCalendar(sessKey string, client *http.Client) (*Calendar, error){
+func getCalendar(sessKey string, client *http.Client) (*Calendar, error) {
 	t := time.Now()
 
 	ge := []Service{
 		{
-			Index: 0,
+			Index:      0,
 			MethodName: "core_calendar_get_calendar_monthly_view",
 			Args: Args{
-				Year:  t.Year(),
-				Month: int(t.Month()),
-				CourseID: 1,
-				CategoryID: 0,
+				Year:              t.Year(),
+				Month:             int(t.Month()),
+				CourseID:          1,
+				CategoryID:        0,
 				IncludeNavigation: true,
-				Mini: true,
-				Day: t.Day(),
+				Mini:              true,
+				Day:               t.Day(),
 			},
 		},
 	}
@@ -225,15 +223,15 @@ func getCalendar(sessKey string, client *http.Client) (*Calendar, error){
 	return &calendar[0], nil
 }
 
-func simpleParse(in []byte, from string, to string) []byte{
+func simpleParse(in []byte, from string, to string) []byte {
 	indexFrom := bytes.Index(in, []byte(from))
-	shift := indexFrom+len(from)
+	shift := indexFrom + len(from)
 
 	if indexFrom != -1 {
 		indexTo := bytes.Index(in[shift:], []byte(to))
 
 		if indexTo != -1 {
-			return in[shift:shift+indexTo]
+			return in[shift : shift+indexTo]
 		}
 	}
 
