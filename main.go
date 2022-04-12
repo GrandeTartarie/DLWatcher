@@ -12,12 +12,13 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"sync"
 	"time"
 )
 
 var (
-	UAG = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/37.0.2062.94 Chrome/37.0.2062.94 Safari/537.36"
+	UAG      = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/37.0.2062.94 Chrome/37.0.2062.94 Safari/537.36"
+	Timers   TimersType
+	ProxyURL *url.URL
 )
 
 func main() {
@@ -27,10 +28,32 @@ func main() {
 	}
 	//fmt.Println(os.Getenv("DL_LOGIN"))
 
-	proxyUrl, err := url.Parse("http://127.0.0.1:8888")
+	ProxyURL, err = url.Parse("http://127.0.0.1:8888")
 	if err != nil {
 		log.Panicln(err)
 	}
+
+	ticker := time.NewTicker(
+		time.Duration(ReCheckEveryInMinutes) *
+			time.Minute)
+	quit := make(chan struct{})
+
+	work()
+	for {
+		select {
+		case <-ticker.C:
+			work()
+		case <-quit:
+			ticker.Stop()
+			return
+		}
+	}
+}
+
+func work() {
+	fmt.Printf("%s:\n", time.Now().Format(time.Stamp))
+	// reset prev timers
+	Timers.Close()
 
 	jar, err := cookiejar.New(nil)
 	if err != nil {
@@ -39,14 +62,16 @@ func main() {
 
 	client := &http.Client{
 		Jar:       jar,
-		Transport: &http.Transport{Proxy: http.ProxyURL(proxyUrl)},
+		Transport: &http.Transport{Proxy: http.ProxyURL(ProxyURL)},
 	}
 
+	fmt.Println("Authentication...")
 	sessKey, err := auth(client)
 	if err != nil {
 		log.Panicln(err)
 	}
 
+	fmt.Println("Getting calendar...")
 	calendar, err := getCalendar(sessKey, client)
 	if err != nil {
 		log.Panicln(err)
@@ -54,15 +79,18 @@ func main() {
 	//fmt.Printf("%+v\n", calendar)
 
 	events := calendar.GetActiveEvents()
-
-	wg := sync.WaitGroup{}
-	wg.Add(len(events))
 	latency := int64(time.Minute.Seconds())
 
-	fmt.Printf("%+v\n", events)
+	//fmt.Printf("%+v\n", events)
 	if len(events) == 0 {
 		fmt.Println("Nothing to visit((")
 	}
+
+	Timers = VisitEvents(events, latency, client)
+}
+
+func VisitEvents(events []Event, latency int64, client *http.Client) []*time.Timer {
+	var timers []*time.Timer
 
 	for _, e := range events {
 		sleep := e.TimeStart + latency - time.Now().Unix()
@@ -73,11 +101,9 @@ func main() {
 			sleep/int64(time.Minute.Seconds()),
 		)
 
-		time.AfterFunc(
+		timers = append(timers, time.AfterFunc(
 			time.Second*time.Duration(sleep),
 			func() {
-				defer wg.Done()
-
 				visitEvent(e, client)
 
 				fmt.Printf(
@@ -85,13 +111,10 @@ func main() {
 					e.Course.FullName,
 				)
 			},
-		)
+		))
 	}
 
-	wg.Wait()
-
-	fmt.Printf("Press Enter to exit...")
-	fmt.Scanf("h")
+	return timers
 }
 
 func visitEvent(event Event, client *http.Client) {
