@@ -98,17 +98,19 @@ func main() {
 			sleep/int64(time.Minute.Seconds()),
 		)
 
-		go func() {
-			defer wg.Done()
+		time.AfterFunc(
+			time.Second*time.Duration(sleep),
+			func() {
+				defer wg.Done()
 
-			time.Sleep(time.Second * time.Duration(sleep))
-			visitEvent(e, client)
-			
-			fmt.Printf(
-				"'%s' has been visited now\n",
-				e.Course.FullName,
-			)
-		}()
+				visitEvent(e, client)
+
+				fmt.Printf(
+					"'%s' has been visited now\n",
+					e.Course.FullName,
+				)
+			},
+		)
 	}
 
 	wg.Wait()
