@@ -57,6 +57,10 @@ func main() {
 	var events []Event
 	for _, w := range calendar.Data.Weeks {
 		for _, d := range w.Days {
+			if !d.HasEvents {
+				continue
+			}
+
 			if d.YDay >= dayN {
 				for _, e := range d.Events {
 					if time.Now().Unix() >
@@ -69,7 +73,6 @@ func main() {
 						)
 						continue
 					}
-
 					events = append(events, e)
 				}
 			}
@@ -80,25 +83,27 @@ func main() {
 	wg.Add(len(events))
 	latency := int64(time.Minute.Seconds())
 
-	//fmt.Printf("%+v\n", events)
+	fmt.Printf("%+v\n", events)
 	if len(events) == 0 {
 		fmt.Println("Nothing to visit((")
 	}
 
 	for _, event := range events {
 		e := event
+		sleep := e.TimeStart + latency - time.Now().Unix()
+
+		fmt.Printf(
+			"'%s' will be visited after %d minutes\n",
+			e.Course.FullName,
+			sleep/int64(time.Minute.Seconds()),
+		)
+
 		go func() {
 			defer wg.Done()
-			sleep := e.TimeStart + latency - time.Now().Unix()
-
-			fmt.Printf(
-				"'%s' will be visited after %d minutes\n",
-				e.Course.FullName,
-				sleep/int64(time.Minute.Seconds()),
-			)
 
 			time.Sleep(time.Second * time.Duration(sleep))
 			visitEvent(e, client)
+			
 			fmt.Printf(
 				"'%s' has been visited now\n",
 				e.Course.FullName,
