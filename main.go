@@ -51,33 +51,9 @@ func main() {
 	if err != nil {
 		log.Panicln(err)
 	}
-	fmt.Printf("%+v\n", calendar)
-	dayN := calendar.Data.Date.YDay
+	//fmt.Printf("%+v\n", calendar)
 
-	var events []Event
-	for _, w := range calendar.Data.Weeks {
-		for _, d := range w.Days {
-			if !d.HasEvents {
-				continue
-			}
-
-			if d.YDay >= dayN {
-				for _, e := range d.Events {
-					if time.Now().Unix() >
-						e.TimeStart+e.TimeDuration {
-						fmt.Printf(
-							"You've skipped event: '%s' at %s\n",
-							e.Course.FullName,
-							time.Unix(e.TimeStart, 0).
-								Format(time.UnixDate),
-						)
-						continue
-					}
-					events = append(events, e)
-				}
-			}
-		}
-	}
+	events := calendar.GetActiveEvents()
 
 	wg := sync.WaitGroup{}
 	wg.Add(len(events))
@@ -88,8 +64,7 @@ func main() {
 		fmt.Println("Nothing to visit((")
 	}
 
-	for _, event := range events {
-		e := event
+	for _, e := range events {
 		sleep := e.TimeStart + latency - time.Now().Unix()
 
 		fmt.Printf(
