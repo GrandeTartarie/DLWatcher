@@ -51,6 +51,10 @@ func (c Calendar) GetActiveEvents() []Event {
 
 			if d.YDay >= c.Data.Date.YDay {
 				for _, e := range d.Events {
+					if !e.IsActionEvent || e.TimeDuration == 0 {
+						continue
+					}
+
 					if time.Now().Unix() >
 						e.TimeStart+e.TimeDuration {
 						fmt.Printf(

@@ -16,9 +16,9 @@ import (
 )
 
 var (
-	UAG      = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/37.0.2062.94 Chrome/37.0.2062.94 Safari/537.36"
-	Timers   TimersType
-	ProxyURL *url.URL
+	UAG         = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/37.0.2062.94 Chrome/37.0.2062.94 Safari/537.36"
+	EventWorker = NewEventor()
+	ProxyURL    *url.URL
 )
 
 func main() {
@@ -53,7 +53,7 @@ func main() {
 func work() {
 	fmt.Printf("%s:\n", time.Now().Format(time.Stamp))
 	// reset prev timers
-	Timers.Close()
+	EventWorker.KillAll()
 
 	jar, err := cookiejar.New(nil)
 	if err != nil {
@@ -86,39 +86,66 @@ func work() {
 		fmt.Println("Nothing to visit((")
 	}
 
-	Timers = VisitEvents(events, latency, client)
+	EventWorker = VisitEvents(events, latency, client)
 }
 
-func VisitEvents(events []Event, latency int64, client *http.Client) []*time.Timer {
-	var timers []*time.Timer
+func VisitEvents(events []Event, latency int64, client *http.Client) *Eventor {
+	eventor := NewEventor()
 
 	for _, e := range events {
 		sleep := e.TimeStart + latency - time.Now().Unix()
 
-		fmt.Printf(
-			"'%s' will be visited after %d minutes\n",
-			e.Course.FullName,
-			sleep/int64(time.Minute.Seconds()),
-		)
+		if sleep < 0 {
+			fmt.Printf(
+				"Trying to visit '%s'...\n",
+				e.Course.FullName,
+			)
+		} else {
+			fmt.Printf(
+				"'%s' will be visited after %d minutes\n",
+				e.Course.FullName,
+				sleep/int64(time.Minute.Seconds()),
+			)
+		}
 
-		timers = append(timers, time.AfterFunc(
-			time.Second*time.Duration(sleep),
-			func() {
-				visitEvent(e, client)
+		eventor.Add(func() {
+			err := visitEvent(e, client)
+			if err != nil {
+				log.Println(err.Error())
+			}
 
-				fmt.Printf(
-					"'%s' has been visited now\n",
-					e.Course.FullName,
-				)
-			},
-		))
+			fmt.Printf(
+				"'%s' has been visited now\n",
+				e.Course.FullName,
+			)
+		}, time.Second*time.Duration(sleep))
 	}
 
-	return timers
+	return eventor
 }
 
-func visitEvent(event Event, client *http.Client) {
+func visitEvent(event Event, client *http.Client) error {
+	resp, err := client.Get(event.URL)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
 
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	from := "https://dl.nure.ua/mod/attendance"
+	u := simpleParse(body, from, "\"")
+
+	s := from + string(u)
+	_, err = client.Get(s)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func auth(client *http.Client) (string, error) {
@@ -195,8 +222,9 @@ func getCalendar(sessKey string, client *http.Client) (*Calendar, error) {
 	req, err := http.NewRequest(
 		"POST",
 		fmt.Sprintf(
-			"https://dl.nure.ua/lib/ajax/service.php?sesskey=%s&info=core_calendar_get_calendar_monthly_view",
+			"https://dl.nure.ua/lib/ajax/service.php?sesskey=%s&info=%s",
 			sessKey,
+			ge[0].MethodName,
 		),
 		bytes.NewReader(out),
 	)
