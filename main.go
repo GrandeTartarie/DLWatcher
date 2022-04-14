@@ -11,6 +11,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -23,6 +24,11 @@ var (
 
 func main() {
 	err := godotenv.Load("./.env")
+	if err != nil {
+		log.Panicln(err)
+	}
+
+	ReCheckEveryInMinutes, err = strconv.Atoi(os.Getenv("RECHECK_IN_MINUTES"))
 	if err != nil {
 		log.Panicln(err)
 	}
