@@ -1,5 +1,5 @@
 package main
 
 var (
-	ReCheckEveryInMinutes = 60
+	ReCheckEveryInMinutes = 10
 )

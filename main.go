@@ -28,10 +28,10 @@ func main() {
 	}
 	//fmt.Println(os.Getenv("DL_LOGIN"))
 
-	ProxyURL, err = url.Parse("http://127.0.0.1:8888")
-	if err != nil {
-		log.Panicln(err)
-	}
+	//ProxyURL, err = url.Parse("http://127.0.0.1:8888")
+	//if err != nil {
+	//	log.Panicln(err)
+	//}
 
 	ticker := time.NewTicker(
 		time.Duration(ReCheckEveryInMinutes) *
@@ -60,9 +60,14 @@ func work() {
 		log.Fatalf("Got error while creating cookie jar %s", err.Error())
 	}
 
+	tr := &http.Transport{}
+	if ProxyURL != nil {
+		tr.Proxy = http.ProxyURL(ProxyURL)
+	}
+
 	client := &http.Client{
 		Jar:       jar,
-		Transport: &http.Transport{Proxy: http.ProxyURL(ProxyURL)},
+		Transport: tr,
 	}
 
 	fmt.Println("Authentication...")
@@ -136,7 +141,7 @@ func visitEvent(event Event, client *http.Client) error {
 		return err
 	}
 
-	from := "https://dl.nure.ua/mod/attendance"
+	from := "https://dl.nure.ua/mod/attendance/attendance.php?"
 	u := simpleParse(body, from, "\"")
 
 	s := from + string(u)
