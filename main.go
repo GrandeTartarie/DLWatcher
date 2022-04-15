@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"github.com/joho/godotenv"
 	"io/ioutil"
@@ -83,7 +82,7 @@ func work() {
 	}
 
 	fmt.Println("Getting calendar...")
-	calendar, err := getCalendar(sessKey, client)
+	calendar, err := GetCalendar(sessKey, client)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -204,67 +203,6 @@ func auth(client *http.Client) (string, error) {
 	}
 
 	return string(simpleParse(body, "\"sesskey\":\"", "\"")), nil
-}
-
-func getCalendar(sessKey string, client *http.Client) (*Calendar, error) {
-	t := time.Now()
-
-	ge := []Service{
-		{
-			Index:      0,
-			MethodName: "core_calendar_get_calendar_monthly_view",
-			Args: Args{
-				Year:              t.Year(),
-				Month:             int(t.Month()),
-				CourseID:          1,
-				CategoryID:        0,
-				IncludeNavigation: true,
-				Mini:              true,
-				Day:               t.Day(),
-			},
-		},
-	}
-
-	out, err := json.Marshal(ge)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(
-		"POST",
-		fmt.Sprintf(
-			"https://dl.nure.ua/lib/ajax/service.php?sesskey=%s&info=%s",
-			sessKey,
-			ge[0].MethodName,
-		),
-		bytes.NewReader(out),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("accept", "*/*")
-	req.Header.Set("user-agent", UAG)
-	req.Header.Set("content-type", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	//fmt.Println(string(body))
-
-	var calendar []Calendar
-	if err = json.Unmarshal(body, &calendar); err != nil {
-		return nil, err
-	}
-
-	return &calendar[0], nil
 }
 
 func simpleParse(in []byte, from string, to string) []byte {

@@ -33,8 +33,8 @@ func (ek *Eventor) Add(f func(), dur time.Duration) {
 }
 
 func (ek *Eventor) KillAll() {
-	for i, k := range ek.killers {
+	for _, k := range ek.killers {
 		k <- struct{}{}
-		ek.killers = ek.killers[i+1:]
 	}
+	ek.killers = []Killer{}
 }
