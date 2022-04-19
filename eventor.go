@@ -17,7 +17,7 @@ func NewEventor() *Eventor {
 }
 
 func (ek *Eventor) Add(f func(), dur time.Duration) {
-	killer := make(chan struct{})
+	killer := make(chan struct{}, 1)
 	ek.killers = append(ek.killers, killer)
 
 	t := time.NewTimer(dur)

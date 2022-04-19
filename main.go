@@ -110,6 +110,7 @@ func VisitEvents(events []Event, latency int64, client *http.Client) *Eventor {
 				"Trying to visit '%s'...\n",
 				e.Course.FullName,
 			)
+			sleep = 1
 		} else {
 			fmt.Printf(
 				"'%s' will be visited after %d minutes\n",
@@ -118,8 +119,10 @@ func VisitEvents(events []Event, latency int64, client *http.Client) *Eventor {
 			)
 		}
 
+		event := e
+
 		eventor.Add(func() {
-			err := visitEvent(e, client)
+			err := visitEvent(event, client)
 			if err != nil {
 				log.Println(err.Error())
 			}
@@ -149,10 +152,12 @@ func visitEvent(event Event, client *http.Client) error {
 	from := "https://dl.nure.ua/mod/attendance/attendance.php?"
 	u := simpleParse(body, from, "\"")
 
-	s := from + string(u)
-	_, err = client.Get(s)
-	if err != nil {
-		return err
+	if len(u) != 0 {
+		s := from + string(u)
+		_, err = client.Get(s)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
