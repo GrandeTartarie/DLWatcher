@@ -110,7 +110,7 @@ func VisitEvents(events []Event, latency int64, client *http.Client) *Eventor {
 				"Trying to visit '%s'...\n",
 				e.Course.FullName,
 			)
-			sleep = 1
+			sleep = 0
 		} else {
 			fmt.Printf(
 				"'%s' will be visited after %d minutes\n",
@@ -126,11 +126,6 @@ func VisitEvents(events []Event, latency int64, client *http.Client) *Eventor {
 			if err != nil {
 				log.Println(err.Error())
 			}
-
-			fmt.Printf(
-				"'%s' has been visited now\n",
-				e.Course.FullName,
-			)
 		}, time.Second*time.Duration(sleep))
 	}
 
@@ -158,6 +153,8 @@ func visitEvent(event Event, client *http.Client) error {
 		if err != nil {
 			return err
 		}
+
+		fmt.Printf("%s sucessfully visited!\n", event.Course.FullName)
 	}
 
 	return nil
