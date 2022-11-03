@@ -44,7 +44,7 @@ type Course struct {
 	FullName string `json:"fullname"`
 }
 
-func (c Calendar) GetActiveEvents() []Event {
+func (c *Calendar) GetActiveEvents() []Event {
 	var events []Event
 
 	for _, w := range c.Data.Weeks {
@@ -78,7 +78,7 @@ func (c Calendar) GetActiveEvents() []Event {
 	return events
 }
 
-func GetCalendar(sessKey string, client *http.Client) (*Calendar, error) {
+func GetCalendar(sessKey string, client *Client) (*Calendar, error) {
 	t := time.Now()
 
 	ge := []Service{

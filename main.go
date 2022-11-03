@@ -21,6 +21,10 @@ var (
 	ProxyURL    *url.URL
 )
 
+type Client struct {
+	*http.Client
+}
+
 func main() {
 	err := godotenv.Load("./.env")
 	if err != nil {
@@ -43,11 +47,25 @@ func main() {
 			time.Minute)
 	quit := make(chan struct{})
 
-	work()
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		log.Fatalf("Got error while creating cookie jar %s", err.Error())
+	}
+	c := Client{&http.Client{
+		Timeout: time.Second * 60,
+		Jar:     jar,
+	}}
+
+	// pre-auth to reset session
+	_, err = c.auth()
+	if err != nil {
+		log.Panicln(err)
+	}
+	c.work()
 	for {
 		select {
 		case <-ticker.C:
-			work()
+			c.work()
 		case <-quit:
 			ticker.Stop()
 			return
@@ -55,34 +73,24 @@ func main() {
 	}
 }
 
-func work() {
+func (c *Client) work() {
 	fmt.Printf("%s:\n", time.Now().Format(time.Stamp))
 	// reset prev timers
 	EventWorker.KillAll()
-
-	jar, err := cookiejar.New(nil)
-	if err != nil {
-		log.Fatalf("Got error while creating cookie jar %s", err.Error())
-	}
 
 	tr := &http.Transport{}
 	if ProxyURL != nil {
 		tr.Proxy = http.ProxyURL(ProxyURL)
 	}
 
-	client := &http.Client{
-		Jar:       jar,
-		Transport: tr,
-	}
-
 	fmt.Println("Authentication...")
-	sessKey, err := auth(client)
+	sessKey, err := c.auth()
 	if err != nil {
 		log.Panicln(err)
 	}
 
 	fmt.Println("Getting calendar...")
-	calendar, err := GetCalendar(sessKey, client)
+	calendar, err := GetCalendar(sessKey, c)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -96,10 +104,10 @@ func work() {
 		fmt.Println("Nothing to visit((")
 	}
 
-	EventWorker = VisitEvents(events, latency, client)
+	EventWorker = c.visitEvents(events, latency)
 }
 
-func VisitEvents(events []Event, latency int64, client *http.Client) *Eventor {
+func (c *Client) visitEvents(events []Event, latency int64) *Eventor {
 	eventor := NewEventor()
 
 	for _, e := range events {
@@ -122,7 +130,7 @@ func VisitEvents(events []Event, latency int64, client *http.Client) *Eventor {
 		event := e
 
 		eventor.Add(func() {
-			err := visitEvent(event, client)
+			err := c.visitEvent(event)
 			if err != nil {
 				log.Println(err.Error())
 			}
@@ -132,8 +140,8 @@ func VisitEvents(events []Event, latency int64, client *http.Client) *Eventor {
 	return eventor
 }
 
-func visitEvent(event Event, client *http.Client) error {
-	resp, err := client.Get(event.URL)
+func (c *Client) visitEvent(event Event) error {
+	resp, err := c.Get(event.URL)
 	if err != nil {
 		return err
 	}
@@ -149,7 +157,7 @@ func visitEvent(event Event, client *http.Client) error {
 
 	if len(u) != 0 {
 		s := from + string(u)
-		_, err = client.Get(s)
+		_, err = c.Get(s)
 		if err != nil {
 			return err
 		}
@@ -160,8 +168,8 @@ func visitEvent(event Event, client *http.Client) error {
 	return nil
 }
 
-func auth(client *http.Client) (string, error) {
-	resp, err := client.Get("https://dl.nure.ua/login/index.php")
+func (c *Client) auth() (string, error) {
+	resp, err := c.Get("https://dl.nure.ua/login/index.php")
 	if err != nil {
 		return "", err
 	}
@@ -175,7 +183,6 @@ func auth(client *http.Client) (string, error) {
 	loginToken := simpleParse(body, "name=\"logintoken\" value=\"", "\"")
 
 	values := url.Values{
-		"anchor":     {""},
 		"logintoken": {string(loginToken)},
 		"username":   {os.Getenv("DL_LOGIN")},
 		"password":   {os.Getenv("DL_PASSWORD")},
@@ -192,8 +199,7 @@ func auth(client *http.Client) (string, error) {
 	req.Header.Set("accept", "*/*")
 	req.Header.Set("user-agent", UAG)
 	req.Header.Set("content-type", "application/x-www-form-urlencoded")
-
-	resp1, err := client.Do(req)
+	resp1, err := c.Do(req)
 	if err != nil {
 		return "", err
 	}
